@@ -1,0 +1,2 @@
+Data analysis for audio signal processing is done here.
+These files will not be part of the final project, but will contain information about the justification for the choices made in the final implementation.
