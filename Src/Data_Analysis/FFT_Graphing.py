@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from Constants import TWELVE_TONE,POS_BIN,NEG_BIN
+from Constants import TWELVE_TONE,POS_BIN,NEG_BIN,OCTAVE
+from Functions import increaseHalfSteps,decreaseHalfSteps,incrementByOctave,decrementByOctave
 from scipy import signal
-from scipy.fft import fft, ifft, power_spectrum
  
 
 
@@ -13,13 +13,16 @@ class FFT_Graphing:
 
     def __init__(self,
                  chunkSize = 255,
-                 binWidth = 2**(1/12),
-                 tuningA = 440) -> None:
+                 binWidth = POS_BIN,
+                 tuningA = 440,
+                 frequencyRange = [0,8]) -> None:
         
         self.chunkSize = chunkSize
         self.binWidth = binWidth
-        self.bins: dict = {}
         self.tuningA = tuningA
+        #frequency range is based on note numbers, default [0,8] means C0 to B8
+        self.frequencyRange = frequencyRange
+        self.bins: list = [tuningA]
 
         pass
 
@@ -31,8 +34,28 @@ class FFT_Graphing:
     
     #generating the musical note bins (default A hz value is 440)
     def generateBinList(self):
-        0#TODO
+        currentFrequency = self.tuningA
+
+        #generating frequencies from tuningA to the top of the frequency range
+        for octave in range(4,8):
+            for pitch in range(0,OCTAVE):
+                self.bins.append(increaseHalfSteps(pitch,currentFrequency))
+            currentFrequency = incrementByOctave(currentFrequency)
+        
+        currentFrequency = self.tuningA
+
+        for octave in range(4,0,-1):
+            for pitch in range(0,OCTAVE):
+                self.bins.insert(0,decreaseHalfSteps(pitch,currentFrequency))
+            currentFrequency = decrementByOctave(currentFrequency)
 
 
+            
+
+
+f = FFT_Graphing()
+
+f.generateBinList()
+print(f.bins)
 
 

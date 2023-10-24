@@ -6,3 +6,4 @@ TWELVE_TONE = {
 
 POS_BIN = 2**(1/12)
 NEG_BIN = 2**(-1/12)
+OCTAVE = 12
