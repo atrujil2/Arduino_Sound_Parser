@@ -6,7 +6,10 @@ from Functions import increaseHalfSteps,decreaseHalfSteps,incrementByOctave,decr
 from scipy import signal
  
 
-
+'''
+The costomization features in this folder's scripts is purely for data analysis purposes.
+A lot more of these will eventually become constants in the final implementation.
+'''
 
 
 class FFT_Graphing:
@@ -22,6 +25,7 @@ class FFT_Graphing:
         self.tuningA = tuningA
         #frequency range is based on note numbers, default [0,8] means C0 to B8
         self.frequencyRange = frequencyRange
+        #generated list of bins
         self.bins: list = [tuningA]
 
         pass
@@ -50,6 +54,7 @@ class FFT_Graphing:
             currentFrequency = decrementByOctave(currentFrequency)
 
 
+
             
 
 
@@ -57,5 +62,3 @@ f = FFT_Graphing()
 
 f.generateBinList()
 print(f.bins)
-
-
