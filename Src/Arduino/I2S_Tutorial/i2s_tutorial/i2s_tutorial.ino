@@ -29,10 +29,24 @@ void setup() {
   i2s_driver_install(I2S_PORT, &i2sConfig, 0, NULL);
   i2s_set_pin(I2S_PORT, &pinConfig);
 
+  Serial.begin(115200);
+
 }
 
-
+//time to read the i2s data and plot it to serial
 void loop() {
   // put your main code here, to run repeatedly:
+  int16_t sample = 0;
+  size_t bytesRead;
+
+  i2s_read(I2S_PORT, &sample, sizeof(sample), &bytesRead, portMAX_DELAY);
+
+  if (bytesRead > 0) {
+    int plotValue = (int)sample;
+    Serial.println(plotValue);
+  }
 
 }
+
+
+
