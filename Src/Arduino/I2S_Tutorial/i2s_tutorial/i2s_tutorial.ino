@@ -1,52 +1,90 @@
 #include <driver/i2s.h>
 
-#define I2S_SCK D2
-#define I2S_WS D4
-#define I2S_SD D3
+#define I2S_SCK 6
+#define I2S_WS 5
+#define I2S_SD 7
+
 #define I2S_PORT I2S_NUM_0
 
+#define bufferLen 64
+int16_t sBuffer[bufferLen];
 
-void setup() {
-  
-  i2s_config_t i2sConfig = {
-    .mode = static_cast<i2s_mode_t>(I2S_MODE_MASTER | I2S_MODE_RX),
-    .sample_rate = 16000, // Set the I2S sample rate
-    .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
+
+void i2s_install() {
+  const i2s_config_t i2s_config {
+    .mode = i2s_mode_t(I2S_MODE_MASTER | I2S_MODE_RX),
+    .sample_rate = 44100,
+    .bits_per_sample = i2s_bits_per_sample_t(16),
     .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
-    .communication_format = I2S_COMM_FORMAT_I2S,
-    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-    .dma_buf_count = 4,
-    .dma_buf_len = 60,
+    .communication_format = i2s_comm_format_t(I2S_COMM_FORMAT_STAND_I2S),
+    .intr_alloc_flags = 0,
+    .dma_buf_count = 8,
+    .dma_buf_len = bufferLen,
+    .use_apll = false
   };
+  i2s_driver_install(I2S_PORT, &i2s_config, 0 , NULL);
+}
 
-  i2s_pin_config_t pinConfig = {
+
+
+void i2s_setpin() {
+  const i2s_pin_config_t pin_config = {
     .bck_io_num = I2S_SCK,
     .ws_io_num = I2S_WS,
-    .data_out_num = I2S_PIN_NO_CHANGE,
+    .data_out_num = -1,
     .data_in_num = I2S_SD
   };
 
-  i2s_driver_install(I2S_PORT, &i2sConfig, 0, NULL);
-  i2s_set_pin(I2S_PORT, &pinConfig);
+  i2s_set_pin(I2S_PORT, &pin_config);
+}
+
+
+void setup() {
 
   Serial.begin(115200);
+  Serial.println(" ");
+
+  delay(1000);
+
+  i2s_install();
+  i2s_setpin();
+  i2s_start(I2S_PORT);
+
+  delay(500);
 
 }
 
 //time to read the i2s data and plot it to serial
 void loop() {
-  // put your main code here, to run repeatedly:
-  int16_t sample = 0;
-  size_t bytesRead;
+  
+    int rangelimit = 2000;
+    Serial.print(rangelimit * -1);
+    Serial.print(" ");
+    Serial.print(rangelimit);
+    Serial.print(" ");
 
-  i2s_read(I2S_PORT, &sample, sizeof(sample), &bytesRead, portMAX_DELAY);
+    size_t bytesIn = 0;
+    esp_err_t result = i2s_read(I2S_PORT, &sBuffer, bufferLen, &bytesIn, portMAX_DELAY);
 
-  if (bytesRead > 0) {
-    int plotValue = (int)sample;
-    Serial.println(plotValue);
+    if (result == ESP_OK)
+    {
+      int16_t samples_read = bytesIn / 8;
+      if (samples_read > 0) {
+        float mean = 0;
+        for (int16_t i = 0; i < samples_read; i++) {
+          mean += (sBuffer[i]);
+        }
+
+        mean /= samples_read;
+
+        Serial.println(mean);
+      }
+    }
+
+
   }
 
-}
+
 
 
 
