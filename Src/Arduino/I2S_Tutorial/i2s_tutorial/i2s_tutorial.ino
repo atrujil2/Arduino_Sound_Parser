@@ -1,3 +1,4 @@
+#include <arduinoFFT.h>
 #include <driver/i2s.h>
 
 #define I2S_SCK 6
@@ -8,6 +9,12 @@
 
 #define bufferLen 64
 int16_t sBuffer[bufferLen];
+
+const char* noteNames[] = {"Ab", "A ", "Bb", "B ", "C ", "C#", "D ", "Eb", "E ", "F ", "F#", "G "};
+const int octaves[] = {0,1,2,3,4,5,6,7,8};
+const int scaleSteps[] = {0,1,2,3,4,5,6,7,8,9,10,11,12};
+int tuningAFrequency = 440;
+
 
 
 void i2s_install() {
@@ -40,7 +47,6 @@ void i2s_setpin() {
 
 
 void setup() {
-
   Serial.begin(115200);
   Serial.println(" ");
 
@@ -51,16 +57,12 @@ void setup() {
   i2s_start(I2S_PORT);
 
   delay(500);
-
-  const char* noteNames[] = {"Ab", "A ", "Bb", "B ", "C ", "C#", "D ", "Eb", "E ", "F ", "F#", "G "};
-  const int octaves[] = {0,1,2,3,4,5,6,7,8};
-  const int scaleSteps[] = {0,1,2,3,4,5,6,7,8,9,10,11,12};
-  int tuningAFrequency = 440;
 }
 
 //time to read the i2s data and plot it to serial
 void loop() {
   
+    //plot a constant line so that the serial plotting window holds a constant range
     int rangelimit = 1500;
     Serial.print(rangelimit * -1);
     Serial.print(" ");
