@@ -52,12 +52,16 @@ void setup() {
 
   delay(500);
 
+  const char* noteNames[] = {"Ab", "A ", "Bb", "B ", "C ", "C#", "D ", "Eb", "E ", "F ", "F#", "G "};
+  const int octaves[] = {0,1,2,3,4,5,6,7,8};
+  const int scaleSteps[] = {0,1,2,3,4,5,6,7,8,9,10,11,12};
+  int tuningAFrequency = 440;
 }
 
 //time to read the i2s data and plot it to serial
 void loop() {
   
-    int rangelimit = 2000;
+    int rangelimit = 1500;
     Serial.print(rangelimit * -1);
     Serial.print(" ");
     Serial.print(rangelimit);
