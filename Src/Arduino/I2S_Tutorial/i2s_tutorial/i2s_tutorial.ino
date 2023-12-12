@@ -1,14 +1,30 @@
+#include <LiquidCrystal.h>
 #include <arduinoFFT.h>
 #include <driver/i2s.h>
 
+//microphone pin definitions
 #define I2S_SCK 6
 #define I2S_WS 5
 #define I2S_SD 7
+
+//lcd display pin definitions
+#define LCD_D4 17
+#define LCD_D5 10
+#define LCD_D6 9
+#define LCD_D7 8
+#define LCD_RS 18
+#define LCD_E 21
+
 
 #define I2S_PORT I2S_NUM_0
 
 #define bufferLen 64
 int16_t sBuffer[bufferLen];
+
+
+//lcd setup
+LiquidCrystal lcd(LCD_RS, LCD_E, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
+//LiquidCrystal lcd(18, 21, 17, 10, 9, 8);
 
 const char* noteNames[] = {"Ab", "A ", "Bb", "B ", "C ", "C#", "D ", "Eb", "E ", "F ", "F#", "G "};
 const int octaves[] = {0,1,2,3,4,5,6,7,8};
@@ -70,6 +86,9 @@ void setup() {
   i2s_start(I2S_PORT);
 
   delay(500);
+
+  lcd.begin(16, 2);
+  lcd.print("Hello, World!");
 }
 
 //time to read the i2s data and plot it to serial
@@ -97,6 +116,9 @@ void loop() {
         mean /= samples_read;
 
         Serial.println(mean);
+        
+        lcd.print(mean);
+        
       }
     }
 
