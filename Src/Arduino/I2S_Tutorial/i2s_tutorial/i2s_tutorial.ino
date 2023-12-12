@@ -6,6 +6,7 @@
 #define I2S_SCK 6
 #define I2S_WS 5
 #define I2S_SD 7
+#define I2S_PORT I2S_NUM_0
 
 //lcd display pin definitions
 #define LCD_D4 17
@@ -15,16 +16,29 @@
 #define LCD_RS 18
 #define LCD_E 21
 
+//fft initialization stuff
+#define FFT_BUFFER_SIZE 256 //number of samples that will be used in fft calculation
+double fftBuffer[FFT_BUFFER_SIZE];
+int fftBufferIndex = 0;
 
-#define I2S_PORT I2S_NUM_0
+arduinoFFT FFT = arduinoFFT();
+double vReal[FFT_BUFFER_SIZE];
+float frequencyBins[FFT_BUFFER_SIZE / 2];
+//float vImag[FFT_BUTTER_SIZE];
+
+
+
 
 #define bufferLen 64
 int16_t sBuffer[bufferLen];
 
 
 //lcd setup
-LiquidCrystal lcd(LCD_RS, LCD_E, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
+const int rs = 18, en = 21, d4 = 17, d5 = 10, d6 = 9, d7 = 8;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 //LiquidCrystal lcd(18, 21, 17, 10, 9, 8);
+
+
 
 const char* noteNames[] = {"Ab", "A ", "Bb", "B ", "C ", "C#", "D ", "Eb", "E ", "F ", "F#", "G "};
 const int octaves[] = {0,1,2,3,4,5,6,7,8};
@@ -76,8 +90,14 @@ void i2s_setpin() {
 
 //setup
 void setup() {
+
+  
+
   Serial.begin(115200);
   Serial.println(" ");
+
+  lcd.begin(16, 2);
+  lcd.print("Hello, World!");  
 
   delay(1000);
 
@@ -87,8 +107,7 @@ void setup() {
 
   delay(500);
 
-  lcd.begin(16, 2);
-  lcd.print("Hello, World!");
+  
 }
 
 //time to read the i2s data and plot it to serial
@@ -96,11 +115,12 @@ void loop() {
   
     //plot a constant line so that the serial plotting window holds a constant range
     int rangelimit = 1500;
+    /*
     Serial.print(rangelimit * -1);
     Serial.print(" ");
     Serial.print(rangelimit);
     Serial.print(" ");
-
+    */
     size_t bytesIn = 0;
     esp_err_t result = i2s_read(I2S_PORT, &sBuffer, bufferLen, &bytesIn, portMAX_DELAY);
 
@@ -115,9 +135,33 @@ void loop() {
 
         mean /= samples_read;
 
-        Serial.println(mean);
+        //Serial.println(mean);
         
-        lcd.print(mean);
+        fftBuffer[fftBufferIndex] = mean;
+
+        fftBufferIndex = (fftBufferIndex + 1) % FFT_BUFFER_SIZE;
+
+        if (fftBufferIndex == 0) { 
+          //perform fft
+          //use a hamming window for the fft to reduce spectral leakage
+          FFT.Windowing(fftBuffer, FFT_BUFFER_SIZE, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+
+          FFT.Compute(fftBuffer, vReal, FFT_BUFFER_SIZE, FFT_FORWARD);
+
+          FFT.ComplexToMagnitude(fftBuffer, vReal, FFT_BUFFER_SIZE);
+
+          for (int i = 0; i < FFT_BUFFER_SIZE / 2; i++) {
+            float frequency = (float)i * 44100.0 / (float)FFT_BUFFER_SIZE;
+
+            frequencyBins[i] = frequency;
+            
+          }
+
+          
+
+
+        }
+        
         
       }
     }
