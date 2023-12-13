@@ -17,17 +17,36 @@
 #define LCD_E 21
 
 //fft initialization stuff
-#define FFT_BUFFER_SIZE 256 //number of samples that will be used in fft calculation
+#define FFT_BUFFER_SIZE 2048 //number of samples that will be used in fft calculation
+//i am making this a circular buffer for continuous audio sampling
 double fftBuffer[FFT_BUFFER_SIZE];
+double tempBuffer[FFT_BUFFER_SIZE]; //this is the bufer that gets the fft applied to it
+int fftBufferHead = 0;
+
+
+void addToFFTBuffer(double sample) {
+  fftBuffer[fftBufferHead] = sample;
+  fftBufferHead = (fftBufferHead + 1) % FFT_BUFFER_SIZE;
+}
 int fftBufferIndex = 0;
+double sampleRate = 4096.0;
 
-arduinoFFT FFT = arduinoFFT();
 double vReal[FFT_BUFFER_SIZE];
-float frequencyBins[FFT_BUFFER_SIZE / 2];
-//float vImag[FFT_BUTTER_SIZE];
+double frequencyBins[FFT_BUFFER_SIZE / 2];
+double magnitudes[FFT_BUFFER_SIZE / 2];
+double vImag[FFT_BUFFER_SIZE];
+arduinoFFT FFT = arduinoFFT();
 
 
+unsigned long startTime;
+unsigned long endTime;
 
+void resetVReal() {
+  for (int i = 0; i < FFT_BUFFER_SIZE; i++) {
+    vImag[i] = 0;
+    tempBuffer[i] = 0;
+  }
+}
 
 #define bufferLen 64
 int16_t sBuffer[bufferLen];
@@ -41,6 +60,8 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 
 const char* noteNames[] = {"Ab", "A ", "Bb", "B ", "C ", "C#", "D ", "Eb", "E ", "F ", "F#", "G "};
+int noteNamesLength = sizeof(noteNames) / sizeof(noteNames[0]);
+int noteNameIndex = 4; //the note frequencies we are interested in starts on a C
 const int octaves[] = {0,1,2,3,4,5,6,7,8};
 const int scaleSteps[] = {0,1,2,3,4,5,6,7,8,9,10,11,12};
 int tuningAFrequency = 440;
@@ -56,6 +77,7 @@ const float noteFrequencies[] = {
     2093.00, 2217.46, 2349.32, 2489.02, 2637.02, 2793.83, 2959.96, 3135.96, 3322.44, 3520.00, 3729.31, 3951.07,
     4186.01, 4434.92, 4698.64, 4978.03, 5274.04, 5587.65, 5919.91, 6271.93, 6644.88, 7040.00, 7458.62, 7902.13
 };
+int noteFrequenciesLength = sizeof(noteFrequencies) / sizeof(noteFrequencies[0]);
 
 //sets config and installs the i2s drivers
 void i2s_install() {
@@ -86,6 +108,96 @@ void i2s_setpin() {
   i2s_set_pin(I2S_PORT, &pin_config);
 }
 
+//functions for the final output
+
+void normalizeMagnitudes(double ceiling) {
+  double max = 0;
+  for (int i = 0; i < (FFT_BUFFER_SIZE / 2); i ++) {
+    if (magnitudes[i] > max) {
+      max = magnitudes[i];
+    } 
+  }
+  double scaleFactor = (ceiling / max);
+
+  for (int i = 0; i < (FFT_BUFFER_SIZE / 2); i++) {
+    magnitudes[i] = magnitudes[i] * scaleFactor;
+  }
+}
+
+
+double findFrequencyPeak() {
+  double maxMagnitude = 0;
+  int peakIndex = 0;
+
+  for (int i = 1; i < (FFT_BUFFER_SIZE / 2) - 1; i++) {
+    if (magnitudes[i] > magnitudes[i + 1] && magnitudes[i] > magnitudes[i + 1]) {
+      if (magnitudes[i] > maxMagnitude) {
+        maxMagnitude = magnitudes[i];
+        peakIndex = i;
+      }
+    }
+  }
+  return frequencyBins[peakIndex]; 
+}
+//variation of findFrequencyPeak. Instead of finding the overall highest, it finds the first peak above a threshold (the fundimental frequency)
+double findFirstFrequencyPeakAboveThreshold(double threshold) {
+  double maxMagnitude = 0;
+  int peakIndex = 0;
+  bool foundPeak = false;
+
+  for (int i = 1; i < (FFT_BUFFER_SIZE / 2) - 1; i++) {
+    if (magnitudes[i] > threshold && magnitudes[i] > magnitudes[i + 1] && magnitudes[i] > magnitudes[i + 1]) {
+      if (magnitudes[i] > maxMagnitude) {
+        maxMagnitude = magnitudes[i];
+        peakIndex = i;
+        foundPeak = true;
+      }
+    if (foundPeak) {
+      break;
+    }
+  }
+  
+  }
+
+  if (foundPeak == false) {
+    return double(0);
+  }
+  else {
+    return frequencyBins[peakIndex];
+  }
+  
+}
+
+String findClosestNote(double frequency) {
+
+  double difference = 1000;
+  const char* closestNoteName = "";
+  const char* currentNoteName = noteNames[noteNameIndex];
+
+  for (int i = 0; i < noteFrequenciesLength; i++) {
+    
+    float currentFrequency = noteFrequencies[i];
+
+    if (abs(currentFrequency - frequency) <= difference) {
+      difference = frequency - currentFrequency;
+      closestNoteName = currentNoteName;
+    }
+
+    noteNameIndex = (noteNameIndex + 1) % noteNamesLength; //loop around the note names and repeat as long as needed
+    currentNoteName = noteNames[noteNameIndex];
+
+
+  }
+  String output = String(closestNoteName) + " " + String(difference) + " " + String(frequency);
+
+  return output;
+  
+}
+
+
+
+
+
 
 
 //setup
@@ -99,20 +211,18 @@ void setup() {
   lcd.begin(16, 2);
   lcd.print("Hello, World!");  
 
-  delay(1000);
+  //delay(1000);
 
   i2s_install();
   i2s_setpin();
   i2s_start(I2S_PORT);
 
-  delay(500);
-
-  
+  //delay(500);
 }
 
 //time to read the i2s data and plot it to serial
 void loop() {
-  
+    startTime = micros();
     //plot a constant line so that the serial plotting window holds a constant range
     int rangelimit = 1500;
     /*
@@ -121,6 +231,8 @@ void loop() {
     Serial.print(rangelimit);
     Serial.print(" ");
     */
+
+    
     size_t bytesIn = 0;
     esp_err_t result = i2s_read(I2S_PORT, &sBuffer, bufferLen, &bytesIn, portMAX_DELAY);
 
@@ -128,7 +240,7 @@ void loop() {
     {
       int16_t samples_read = bytesIn / 8;
       if (samples_read > 0) {
-        float mean = 0;
+        float mean = 0.0;
         for (int16_t i = 0; i < samples_read; i++) {
           mean += (sBuffer[i]);
         }
@@ -137,35 +249,70 @@ void loop() {
 
         //Serial.println(mean);
         
-        fftBuffer[fftBufferIndex] = mean;
+        //fftBuffer[fftBufferIndex] = mean;
+        addToFFTBuffer(mean);
 
         fftBufferIndex = (fftBufferIndex + 1) % FFT_BUFFER_SIZE;
 
-        if (fftBufferIndex == 0) { 
-          //perform fft
-          //use a hamming window for the fft to reduce spectral leakage
-          FFT.Windowing(fftBuffer, FFT_BUFFER_SIZE, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
-
-          FFT.Compute(fftBuffer, vReal, FFT_BUFFER_SIZE, FFT_FORWARD);
-
-          FFT.ComplexToMagnitude(fftBuffer, vReal, FFT_BUFFER_SIZE);
-
-          for (int i = 0; i < FFT_BUFFER_SIZE / 2; i++) {
-            float frequency = (float)i * 44100.0 / (float)FFT_BUFFER_SIZE;
-
-            frequencyBins[i] = frequency;
-            
-          }
-
+        //condition for performing fft
+        if (fftBufferHead % 256 == 0) { 
+          
           
 
+          for (int i = 0; i < FFT_BUFFER_SIZE; i ++) {
+            int circularIndex = (fftBufferHead + i) % FFT_BUFFER_SIZE;
+            tempBuffer[i] = fftBuffer[circularIndex];
+          }
+          
+
+          endTime = micros();
+          //Serial.println((endTime - startTime));
+          //perform fft
+          //use a hamming window for the fft to reduce spectral leakage
+          FFT.Windowing(tempBuffer, FFT_BUFFER_SIZE, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+
+          FFT.Compute(tempBuffer, vImag, FFT_BUFFER_SIZE, FFT_FORWARD);
+
+          FFT.ComplexToMagnitude(tempBuffer, vImag, FFT_BUFFER_SIZE);
+          
+          for (int i = 0; i < FFT_BUFFER_SIZE / 2; i++) {
+            double frequency = ((double)i * sampleRate) / (double)FFT_BUFFER_SIZE;
+            double magnitude = tempBuffer[i];
+            
+            frequencyBins[i] = frequency;
+            magnitudes[i] = magnitude;
+
+            
+
+            
+            //Serial.println(frequency);
+            
+            //Serial.print(0);
+            //Serial.print(" ");
+            //Serial.print(magnitude);
+            //Serial.print(" ");
+            //Serial.println(frequency);
+            //Serial.print(" ");
+            //Serial.println(2048.0);
+          }
+          normalizeMagnitudes(50000);
+          double peakFrequency = findFirstFrequencyPeakAboveThreshold(10000);
+          String note = findClosestNote(peakFrequency);
+          Serial.print("Note: ");
+          Serial.print(note);
+          Serial.print("  ");
+          Serial.print(magnitudes[220]);
+          Serial.print(" ");
+          Serial.println(frequencyBins[220]);          
+          
+          resetVReal();
+          
 
         }
         
-        
       }
-    }
 
+    }
 
   }
 
