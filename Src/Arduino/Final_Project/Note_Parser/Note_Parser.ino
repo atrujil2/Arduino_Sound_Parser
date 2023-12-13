@@ -48,6 +48,7 @@ void resetVReal() {
   }
 }
 
+//buffer for sound sampling
 #define bufferLen 64
 int16_t sBuffer[bufferLen];
 
@@ -130,7 +131,7 @@ double findFrequencyPeak() {
   int peakIndex = 0;
 
   for (int i = 1; i < (FFT_BUFFER_SIZE / 2) - 1; i++) {
-    if (magnitudes[i] > magnitudes[i + 1] && magnitudes[i] > magnitudes[i + 1]) {
+    if (magnitudes[i] > magnitudes[i + 1] && magnitudes[i] > magnitudes[i - 1]) {
       if (magnitudes[i] > maxMagnitude) {
         maxMagnitude = magnitudes[i];
         peakIndex = i;
@@ -146,7 +147,7 @@ double findFirstFrequencyPeakAboveThreshold(double threshold) {
   bool foundPeak = false;
 
   for (int i = 1; i < (FFT_BUFFER_SIZE / 2) - 1; i++) {
-    if (magnitudes[i] > threshold && magnitudes[i] > magnitudes[i + 1] && magnitudes[i] > magnitudes[i + 1]) {
+    if (magnitudes[i] > threshold && magnitudes[i] > magnitudes[i + 1] && magnitudes[i] > magnitudes[i - 1]) {
       if (magnitudes[i] > maxMagnitude) {
         maxMagnitude = magnitudes[i];
         peakIndex = i;
