@@ -7,3 +7,5 @@ The point of this project for me is to get better at programming in C/C++ and to
 Currently, it has a very limited range for frequency identification, but I am working through it to fix this issue.
 
 By the end of this project, my goal is for this to become efficient and accurate enough to be used as an instrument tuner.
+
+(I am not accepting collaborators or pull requests from people)
